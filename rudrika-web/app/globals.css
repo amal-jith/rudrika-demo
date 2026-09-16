@@ -1,0 +1,232 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Jost:wght@300;400;500;600&family=Great+Vibes&display=swap");
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-cream text-ink font-body antialiased;
+}
+
+/* leave room for the mobile bottom nav */
+@media (max-width: 639px) {
+  body {
+    padding-bottom: 64px;
+  }
+}
+/* Product pages used to add another 132px here for a sticky buy bar. That bar
+   is gone — both buy buttons sit in the page now — so the extra space would
+   just be a gap at the bottom of every product page. */
+
+/* never let anything cause sideways scroll on phones */
+html,
+body {
+  overflow-x: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-4 {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center px-6 py-3 text-sm tracking-wide font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+.btn-primary {
+  @apply btn bg-clay text-cream hover:bg-clay-dark hover:shadow-lg hover:shadow-clay/20;
+}
+.btn-gold {
+  @apply btn bg-gold text-cream hover:bg-gold-dark hover:shadow-lg hover:shadow-gold/25;
+}
+.btn-outline {
+  @apply btn border border-ink/30 hover:border-clay hover:bg-clay hover:text-cream;
+}
+.input {
+  @apply w-full border border-ink/20 bg-white px-4 py-2.5 text-sm focus:outline-none focus:border-gold transition-colors;
+}
+.label {
+  @apply block text-xs uppercase tracking-widest text-ink/60 mb-1.5;
+}
+.admin-card {
+  @apply bg-white border border-ink/10 p-5;
+}
+
+/* gold ornamental divider */
+.gold-divider {
+  @apply flex items-center justify-center gap-3 my-4;
+}
+.gold-divider::before,
+.gold-divider::after {
+  content: "";
+  @apply block h-px w-16 bg-gold/60;
+}
+
+/* soft card lift on hover */
+.lift {
+  @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-ink/10;
+}
+
+/* image zoom-on-hover frame */
+.zoom-frame img,
+.zoom-frame video {
+  @apply transition-transform duration-700;
+}
+.zoom-frame:hover img,
+.zoom-frame:hover video {
+  transform: scale(1.06);
+}
+
+/* staggered fade-up helpers */
+.stagger > * {
+  animation: fadeUp 0.7s ease-out both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger > *:nth-child(2) { animation-delay: 0.15s; }
+.stagger > *:nth-child(3) { animation-delay: 0.25s; }
+.stagger > *:nth-child(4) { animation-delay: 0.35s; }
+.stagger > *:nth-child(5) { animation-delay: 0.45s; }
+.stagger > *:nth-child(6) { animation-delay: 0.55s; }
+
+/* scrolling sale bar */
+.marquee-bar {
+  animation-name: marqueeBar;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.group:hover .marquee-bar {
+  animation-play-state: paused;
+}
+@keyframes marqueeBar {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* order confirmation celebration */
+@keyframes popIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes drawCheck {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes confettiFall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes fadeUp {
+  0% { opacity: 0; transform: translateY(24px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Gallery stories ───────────────────────────────────────────── */
+
+/* The progress bar that fills while a story photo is on screen. */
+@keyframes story-fill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* A slow Ken Burns drift on the photo currently showing in a story. */
+@keyframes story-drift {
+  from { transform: scale(1.06) translateY(1.2%); }
+  to   { transform: scale(1) translateY(0); }
+}
+
+/* Anyone who has asked their system for less motion gets none of it. */
+@media (prefers-reduced-motion: reduce) {
+  [style*="story-drift"] { animation: none !important; }
+}
+
+/* Horizontal rails scroll but shouldn't show a bar over the artwork. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* announcement bar message rotation */
+.announce {
+  position: relative;
+  height: 2rem;
+}
+.announce span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  animation: announceCycle 12s infinite;
+}
+.announce span:nth-child(2) { animation-delay: 4s; }
+.announce span:nth-child(3) { animation-delay: 8s; }
+@keyframes announceCycle {
+  0%, 33.33%, 100% { opacity: 0; }
+  4%, 29% { opacity: 1; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Printing (admin invoice / packing slip)
+   Everything except the invoice sheet is hidden, so the printed
+   page — or the "Save as PDF" file — contains only the document.
+   ───────────────────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* Hide every ancestor's siblings, then reveal the sheet itself. */
+  body * {
+    visibility: hidden;
+  }
+  .invoice-sheet,
+  .invoice-sheet * {
+    visibility: visible;
+  }
+  .invoice-sheet {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Keep rows and size charts from splitting across pages. */
+  .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  a[href]::after {
+    content: "";
+  }
+}
+
+.gold-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #c4a580; }

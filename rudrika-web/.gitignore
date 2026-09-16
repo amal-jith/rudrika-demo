@@ -1,0 +1,9 @@
+node_modules/
+.next/
+prisma/dev.db*
+.env
+public/uploads/*
+!public/uploads/.gitkeep
+*.tsbuildinfo
+next-env.d.ts
+ADMIN-LOGIN.local.txt

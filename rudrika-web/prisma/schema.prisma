@@ -1,0 +1,394 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// SQLite for easy local dev. For production, switch provider to "postgresql"
+// and set DATABASE_URL accordingly — no schema changes needed.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String          @id @default(cuid())
+  email               String          @unique
+  password            String
+  name                String
+  phone               String?
+  // Rudrika: captured at registration and checkout, used for WhatsApp opt-in,
+  // loyalty and the Rudrika Circle membership.
+  whatsappOptIn       Boolean         @default(false)
+  birthday            DateTime?
+  loyaltyPoints       Int             @default(0)
+  lifetimeSpend       Int             @default(0) // paise, delivered orders
+  tier                String          @default("Silver")
+  membershipExpiresAt DateTime?
+  // CUSTOMER | STAFF | MANAGER | ADMIN — see lib/permissions.ts for what each
+  // one can reach. The three staff roles are new; existing rows keep whatever
+  // they already had, so nothing needs rewriting.
+  role                String          @default("CUSTOMER")
+  // Switched off rather than deleted, so a staff member who leaves keeps their
+  // order history and can be switched back on. Defaults to true, which is what
+  // every existing row becomes.
+  active              Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+  orders              Order[]
+  reviews             Review[]
+  wishlist            Wishlist[]
+  addresses           Address[]
+  loyalty             LoyaltyLedger[]
+  photos              CustomerPhoto[]
+  memberships         Membership[]
+  whatsapp            WhatsAppLog[]
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String  @default("Home") // Home | Office | Other
+  name      String  @default("")
+  line1     String
+  line2     String?
+  city      String
+  state     String
+  pincode   String
+  phone     String
+  isDefault Boolean @default(false)
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  image    String?
+  sort     Int       @default(0)
+  enabled  Boolean   @default(true)
+  products Product[]
+}
+
+model Product {
+  id           String          @id @default(cuid())
+  name         String
+  slug         String          @unique
+  description  String
+  price        Int // paise
+  compareAt    Int? // original price for showing discounts (paise)
+  images       String // JSON array of image URLs
+  videos       String          @default("[]") // JSON array of video URLs
+  // Photos per colour: {"Rust": ["/uploads/a.jpg"], "Green": [...]}.
+  // When a colour is picked on the product page its photos replace the gallery.
+  // Empty {} means the product has no colour options and `images` is used.
+  colourImages String          @default("{}")
+  measurements String? // size/measurement details shown on product page
+  fabric       String? // fabric & care details
+  // Rudrika catalogue fields (all additive)
+  productCode  String?         @unique // RUD-<FABRIC>-<0000>
+  hsn          String? // 5007 silk, 5208 cotton and kota, 5309 linen
+  gstRate      Int             @default(5)
+  silkMark     Boolean         @default(false)
+  preorder     Boolean         @default(false)
+  earlyAccess  Boolean         @default(false) // Rudrika Circle members see it first
+  tags         String          @default("[]") // JSON array of strings
+  collections  String          @default("[]") // JSON array of collection handles
+  care         String? // fabric care text
+  categoryId   String?
+  category     Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  featured     Boolean         @default(false)
+  published    Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  variants     Variant[]
+  reviews      Review[]
+  wishlist     Wishlist[]
+  orderItems   OrderItem[]
+  photos       CustomerPhoto[]
+
+  @@index([categoryId])
+  @@index([published, featured])
+}
+
+model Variant {
+  id         String      @id @default(cuid())
+  productId  String
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label      String // the size, e.g. "M", "Free Size"
+  // Colour of this row. Null on products sold in a single colour.
+  // Stock is tracked per (colour, size) pair, so "Rust M" selling out
+  // leaves "Green M" available.
+  colour     String?
+  sku        String?
+  legacySku  String? // the old Shopify SKU (RUD-APP-SAR-00xx)
+  price      Int? // overrides product price if set (paise)
+  stock      Int         @default(0)
+  orderItems OrderItem[]
+
+  @@index([productId])
+}
+
+/// Shipping rates by delivery state. The first enabled zone whose state list
+/// contains the customer's state wins; if none match, `isDefault` is used.
+model ShippingZone {
+  id        String   @id @default(cuid())
+  name      String // "Kerala", "South India", "Rest of India"
+  states    String   @default("[]") // JSON array of state names, lowercase-matched
+  rate      Int      @default(0) // paise
+  freeAbove Int? // paise — order subtotal above which shipping is free
+  isDefault Boolean  @default(false) // fallback when no state matches
+  enabled   Boolean  @default(true)
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+// One real-world event — a wedding, an anchoring gig, a photoshoot — shown as a
+// story circle on the homepage and as a chapter on /gallery.
+model GalleryStory {
+  id        String   @id @default(cuid())
+  title     String // "Aswathy & Sreerag"
+  subtitle  String? // "Wedding · Munnar"
+  story     String? // a paragraph or two, shown above the photos on /gallery
+  cover     String // the circle thumbnail
+  photos    String   @default("[]") // JSON array of image URLs, in order
+  enabled   Boolean  @default(true)
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id                 String        @id @default(cuid())
+  number             Int           @unique
+  userId             String?
+  user               User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email              String
+  name               String
+  phone              String
+  addressLine        String
+  city               String
+  state              String
+  pincode            String
+  subtotal           Int
+  discount           Int           @default(0)
+  shipping           Int           @default(0)
+  total              Int
+  couponCode         String?
+  status             String        @default("PENDING") // PENDING | PLACED | SHIPPED | DELIVERED | CANCELLED
+  paymentStatus      String        @default("PENDING") // PENDING | PAID | FAILED | REFUNDED
+  paymentMethod      String        @default("RAZORPAY") // RAZORPAY | MOCK
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  // Rudrika: GST invoice, loyalty, membership, dispatch and WhatsApp
+  invoiceNumber      String?       @unique
+  invoiceDate        DateTime?
+  pointsRedeemed     Int           @default(0)
+  pointsValue        Int           @default(0) // paise deducted for points
+  pointsEarned       Int           @default(0)
+  membershipDiscount Int           @default(0) // paise
+  whatsappOptIn      Boolean       @default(true)
+  courier            String?
+  awb                String?
+  packedAt           DateTime?
+  shippedAt          DateTime?
+  deliveredAt        DateTime?
+  feedbackSentAt     DateTime?
+  note               String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  items              OrderItem[]
+  whatsapp           WhatsAppLog[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id           String   @id @default(cuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String?
+  product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId    String?
+  variant      Variant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  name         String
+  variantLabel String?
+  image        String?
+  price        Int // unit price paid (paise)
+  qty          Int
+  // Measurements the customer typed on the product page, e.g. 'Bust 36" · Height 5\'4"'.
+  fit          String?
+  // Rudrika: snapshot for the GST invoice and labels
+  sku          String?
+  hsn          String?
+  gstRate      Int?
+  preorder     Boolean  @default(false)
+}
+
+model Coupon {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  type       String    @default("PERCENT") // PERCENT | FLAT
+  value      Int // percent (1-100) or flat paise
+  minOrder   Int       @default(0) // paise
+  maxUses    Int? // null = unlimited
+  usedCount  Int       @default(0)
+  expiresAt  DateTime?
+  active     Boolean   @default(true)
+  // Rudrika: coupons earned by one customer (wearing-photo reward) are bound to them
+  customerId String?
+  singleUse  Boolean   @default(false)
+  note       String?
+  createdAt  DateTime  @default(now())
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int // 1-5
+  title     String?
+  body      String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([productId, userId])
+}
+
+model Wishlist {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, productId])
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+// ─── CMS: editable homepage sections ───
+model HomeSection {
+  id      String  @id @default(cuid())
+  type    String // HERO | CATEGORIES | PRODUCTS | BANNER | VALUES | TESTIMONIALS | VIDEO | CTA | RICHTEXT
+  title   String // admin-facing label
+  sort    Int     @default(0)
+  enabled Boolean @default(true)
+  data    String  @default("{}") // JSON field bag (varies per type)
+}
+
+// ─── CMS: testimonials shown in the sliding strip ───
+model Testimonial {
+  id      String  @id @default(cuid())
+  name    String
+  text    String
+  rating  Int     @default(5)
+  image   String?
+  sort    Int     @default(0)
+  enabled Boolean @default(true)
+}
+
+// ─── CMS: editable content pages (about, contact, policies…) ───
+model Page {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  subtitle  String?
+  blocks    String   @default("[]") // JSON: [{heading, body}]
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Rudrika: loyalty points ledger ───
+model LoyaltyLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta     Int // positive earn, negative redeem
+  reason    String // WELCOME | ORDER | REVIEW | BIRTHDAY | REDEEM | ADJUST
+  orderId   String?
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── Rudrika: customer wearing-photo submissions ───
+model CustomerPhoto {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId  String?
+  product    Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  orderId    String?
+  image      String
+  caption    String?
+  consent    Boolean   @default(false)
+  status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  couponCode String?
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+
+  @@index([status])
+  @@index([productId, status])
+}
+
+// ─── Rudrika Circle: paid annual membership ───
+model Membership {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId        String?
+  startsAt       DateTime  @default(now())
+  expiresAt      DateTime
+  pricePaid      Int // paise
+  active         Boolean   @default(true)
+  reminderSentAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ─── Letters from Tara (blog) ───
+model Post {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  excerpt     String?
+  body        String // plain text or simple markdown, paragraphs on blank lines
+  cover       String?
+  publishedAt DateTime @default(now())
+  published   Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Collections (New arrivals, Best sellers, Unique pieces...) ───
+model Collection {
+  id       String  @id @default(cuid())
+  handle   String  @unique
+  title    String
+  subtitle String?
+  image    String?
+  sort     Int     @default(0)
+  enabled  Boolean @default(true)
+}
+
+// ─── WhatsApp message log (Phase 2 automation hooks, switchable per event) ───
+model WhatsAppLog {
+  id        String   @id @default(cuid())
+  event     String // ORDER_CONFIRMED | PACKED | SHIPPED | DELIVERED | FEEDBACK | PHOTO_REWARD | RENEWAL | WELCOME | MANUAL
+  to        String
+  template  String?
+  text      String
+  status    String   @default("QUEUED") // QUEUED | SENT | FAILED | DISABLED
+  error     String?
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([event, status])
+}

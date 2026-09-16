@@ -1,0 +1,58 @@
+# Render Blueprint for Rudrika by Tara. Use this file when the Git repository root
+# is the whole Rudrika folder (rootDir below). If the repository root is the
+# rudrika-web folder itself, use rudrika-web/render.yaml instead.
+#
+# Render Dashboard: New, Blueprint, pick the repo. It creates the Postgres
+# instance and the web service, wires DATABASE_URL and generates SESSION_SECRET.
+# After the first deploy, log in at /admin with SEED_ADMIN_EMAIL and the
+# SEED_ADMIN_PASSWORD you set in the Environment tab, then change the password.
+databases:
+  - name: rudrika-db
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: rudrika-web
+    runtime: node
+    rootDir: rudrika-web
+    plan: free
+    region: singapore
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rudrika-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: NEXT_PUBLIC_SITE_URL
+        value: https://rudrika-web.onrender.com
+      - key: NEXT_PUBLIC_STORE_NAME
+        value: Rudrika by Tara
+      - key: SEED_ADMIN_EMAIL
+        value: admin@rudrika.in
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_ADMIN_NUMBERS
+        sync: false
+    # Uploads made from Admin (new product photos, customer wearing photos) live on
+    # the disk below. Without it they disappear on the next deploy. Free instances
+    # cannot mount a disk; Starter and above can.
+    disk:
+      name: rudrika-uploads
+      mountPath: /opt/render/project/src/public/uploads
+      sizeGB: 5

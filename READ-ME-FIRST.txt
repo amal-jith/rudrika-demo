@@ -1,0 +1,17 @@
+Rudrika by Tara, developer build (single zip for chat delivery)
+
+This zip has everything needed to run, review and host the store, except two heavy media
+sets that could not travel through the chat channel (30 MB cap):
+
+1. Product photos (224 files, 45 MB). Regenerate them in about a minute, before seeding:
+       cd rudrika-web && node scripts/fetch-rudrika-images.js
+   They download from the live rudrika.in catalogue into public/uploads/products/.
+   The same files are also in Rudrika-final-build-part2 to part6 zips and in the complete
+   zip on Dan's Mac (~/Downloads/Rudrika-final-build-2026-09-13.zip).
+
+2. The three campaign films for the design site (21 MB, review only, not needed for hosting).
+   They are in Rudrika-final-build-part7 to part9 zips; drop them into
+   landing-concepts/rudrika-site/media/ to play them on the design site.
+
+Then follow docs/HANDOFF.md (run steps, admin login, what is built, Razorpay and WhatsApp
+switch-on, VPS checklist). Quick start is in rudrika-web/README.md.
