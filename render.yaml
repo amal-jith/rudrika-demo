@@ -52,7 +52,4 @@ services:
     # Uploads made from Admin (new product photos, customer wearing photos) live on
     # the disk below. Without it they disappear on the next deploy. Free instances
     # cannot mount a disk; Starter and above can.
-    disk:
-      name: rudrika-uploads
-      mountPath: /opt/render/project/src/public/uploads
-      sizeGB: 5
+
